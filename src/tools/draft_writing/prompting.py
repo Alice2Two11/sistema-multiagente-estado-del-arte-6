@@ -132,26 +132,35 @@ REGLAS:
    rango orientativo: {budget['minimum_words']}-{budget['maximum_words']}.
 10. UNA oración por elemento de "sentences" -- nunca combines dos
     oraciones en un solo "text", nunca dejes un "text" vacío.
-11. "text" contiene ÚNICAMENTE el texto de la oración -- SIN ningún
+11. Si una idea combina varias afirmaciones distintas unidas por
+    conectores como "aunque", "a pesar de", "sin embargo", "mientras
+    que" (ej. "el método X es eficaz, pero presenta la limitación Y
+    por la causa Z"), divide cada afirmación verificable en un
+    elemento de "sentences" separado, cada uno con su propio handle
+    de evidencia -- una oración que mezcla eficacia, limitación y
+    causa en un solo "text" es más difícil de verificar por completo
+    que varias oraciones simples, cada una respaldable por su propia
+    evidencia.
+12. "text" contiene ÚNICAMENTE el texto de la oración -- SIN ningún
     identificador técnico ni número de evidencia dentro. Nunca escribas
     "source_filename", "chunk_id", corchetes de cita, ni el propio
     handle (ej. "E1") dentro de "text".
-12. "supporting_evidence_ids" solo puede contener HANDLES (los números
+13. "supporting_evidence_ids" solo puede contener HANDLES (los números
     "E1", "E2", ... tal como aparecen en EVIDENCIA_DISPONIBLE) -- NUNCA
     el source_filename ni el chunk_id en sí. Un handle que no exista en
     EVIDENCIA_DISPONIBLE invalida la respuesta completa.
-13. Un valor numérico solo puede escribirse si aparece literalmente en
+14. Un valor numérico solo puede escribirse si aparece literalmente en
     el texto de uno de los handles de evidencia citados por esa misma
     oración.
-14. Toda oración con contenido factual/científico debe llevar al menos
+15. Toda oración con contenido factual/científico debe llevar al menos
     un handle en "supporting_evidence_ids". Omite cualquier oración que
     no tenga evidencia documental real.
-15. PROHIBIDO incluir en cualquier elemento de "sentences" los campos:
+16. PROHIBIDO incluir en cualquier elemento de "sentences" los campos:
     "supporting_citations", "source_filename", "chunk_id", "claim",
     "claim_id", "claim_uid", "sentence_id", "identity_action",
     "parent_claim_uids". El sistema los asigna/resuelve después -- si
     los incluyes, la respuesta completa será rechazada.
-16. Devuelve ÚNICAMENTE JSON válido -- sin fences de Markdown (nunca
+17. Devuelve ÚNICAMENTE JSON válido -- sin fences de Markdown (nunca
     ```json ni ```), sin texto antes ni después del JSON.
 
 FORMATO EXACTO (el único permitido):
