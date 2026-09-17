@@ -1,0 +1,34 @@
+# Entorno reproducible validado en Python 3.11 / Google Colab
+
+langchain-core==0.3.86
+langchain-openai==0.3.35
+# MAIN 5: LangGraph será el ÚNICO orquestador final del sistema.
+# pipeline_orchestrator.py (el motor propio basado en máquina de estados)
+# se conserva SOLO temporalmente, durante la validación/regresión de esta
+# migración -- se retira al cierre del Bloque 6. Compatibilidad verificada
+# explícitamente contra langchain-core==0.3.86 / langchain-openai==0.3.35
+# (pip check limpio, sin relajar ningún pin existente). No subir a
+# langgraph>=1.0: exige langchain-core>=1.0.
+langgraph==0.6.11
+openai==1.109.1
+
+chromadb==1.5.9
+
+pandas==3.0.5
+numpy==2.4.6
+PyMuPDF==1.28.2
+langdetect==1.0.9
+cryptography==46.0.7
+
+rouge-score==0.1.2
+bert-score==0.3.13
+sentence-transformers==5.7.0
+scikit-learn==1.9.0
+matplotlib==3.11.1
+tabulate==0.10.0
+
+transformers==4.46.3
+tokenizers==0.20.3
+huggingface-hub==0.36.2
+
+torch==2.13.0
