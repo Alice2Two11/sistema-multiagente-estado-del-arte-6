@@ -134,13 +134,27 @@ REGLAS:
     oraciones en un solo "text", nunca dejes un "text" vacío.
 11. Si una idea combina varias afirmaciones distintas unidas por
     conectores como "aunque", "a pesar de", "sin embargo", "mientras
-    que" (ej. "el método X es eficaz, pero presenta la limitación Y
-    por la causa Z"), divide cada afirmación verificable en un
-    elemento de "sentences" separado, cada uno con su propio handle
-    de evidencia -- una oración que mezcla eficacia, limitación y
-    causa en un solo "text" es más difícil de verificar por completo
-    que varias oraciones simples, cada una respaldable por su propia
-    evidencia.
+    que", "pero", divide cada afirmación verificable en un elemento de
+    "sentences" separado, cada uno con su propio handle de evidencia.
+    Ejemplo de lo que NUNCA debes hacer (una sola oración mezclando
+    eficacia y limitación -- el patrón es estructural/gramatical, no
+    depende del tema del que trate el estado del arte):
+      MAL: "Aunque el enfoque propuesto por los autores obtuvo mejores
+      resultados que el método de referencia, su aplicabilidad se ve
+      limitada por el tamaño reducido de la muestra utilizada."
+    En su lugar, divide SIEMPRE en dos oraciones independientes, cada
+    una con el/los handles que la respaldan específicamente a ELLA:
+      BIEN: [
+        "El enfoque propuesto por los autores obtuvo mejores
+        resultados que el método de referencia.",
+        "La aplicabilidad del enfoque propuesto se ve limitada por
+        el tamaño reducido de la muestra utilizada."
+      ]
+    Esta regla es obligatoria, no opcional: cualquier oración que
+    contenga "aunque", "a pesar de", "sin embargo", "mientras que" o
+    "pero" uniendo dos ideas verificables por separado debe dividirse
+    -- sin excepción, incluso si la evidencia disponible respalda
+    ambas partes.
 12. "text" contiene ÚNICAMENTE el texto de la oración -- SIN ningún
     identificador técnico ni número de evidencia dentro. Nunca escribas
     "source_filename", "chunk_id", corchetes de cita, ni el propio
