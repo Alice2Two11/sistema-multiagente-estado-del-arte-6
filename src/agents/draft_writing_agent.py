@@ -40,6 +40,8 @@ from src.tools.draft_writing.input_validation import validate_draft_dependencies
 from src.tools.draft_writing.prompting import (
     assign_section_budgets,
     build_source_free_organizational_section,
+    build_dynamic_split_example_prompt,
+    validate_dynamic_split_example,
 )
 from src.tools.draft_writing.retrieval import (
     build_section_query,
@@ -217,6 +219,56 @@ class DraftWritingAgent:
         del strategy
         target_total_words = int(policy["target_total_words"])
         return assign_section_budgets(sections, target_total_words)
+
+    # Genera (o reutiliza de una corrida previa) el ejemplo MAL/BIEN de
+    # la regla 11, UNA sola vez por experimento -- nunca por sección ni
+    # por intento -- con vocabulario del tema real de la corrida en vez
+    # de un ejemplo fijo de un solo dominio o uno completamente
+    # genérico. Fail-open: cualquier error (LLM, parseo, validación) se
+    # traga aquí mismo y deja policy["dynamic_split_example"] = None,
+    # con lo que build_section_prompt_v2 cae automáticamente al ejemplo
+    # estático neutral -- nunca detiene ni degrada la ejecución de la 06.
+    def _dynamic_split_example(
+        self,
+        policy: Mapping[str, Any],
+        bundle: Mapping[str, Any],
+        out: Path,
+    ) -> tuple[dict[str, Any] | None, bool]:
+        """Devuelve (ejemplo_o_None, se_hizo_llamada_llm) -- el segundo
+        valor es para que execute() registre correctamente llm_calls
+        incluso cuando la llamada se hizo pero falló la validación."""
+        cache_path = out / "dynamic_split_example.json"
+        if cache_path.exists():
+            try:
+                cached = json.loads(cache_path.read_text(encoding="utf-8"))
+                if validate_dynamic_split_example(cached):
+                    return cached, False  # reutilizado, no se llamó al LLM ahora.
+            except Exception:
+                pass  # cache corrupta o inválida -- se regenera abajo.
+
+        topic = (
+            policy.get("experiment_profile", {}).get("topic_name")
+            or policy.get("topic_profile", {}).get("topic_name")
+            or bundle.get("outline", {}).get("topic", "")
+        )
+        try:
+            prompt = build_dynamic_split_example_prompt(topic)
+            raw = self.runtime.invoke(prompt)
+            example = self.runtime.parse(raw)
+        except Exception:
+            return None, True  # la llamada se hizo pero falló -- cuenta igual.
+
+        if not validate_dynamic_split_example(example):
+            return None, True
+
+        try:
+            cache_path.write_text(
+                json.dumps(example, ensure_ascii=False, indent=2), encoding="utf-8"
+            )
+        except Exception:
+            pass  # no cachear no es motivo para descartar un ejemplo ya válido.
+
+        return example, True
 
     # Prepara la búsqueda de evidencia para una sección
     # usando los fragmentos disponibles de los papers.
@@ -439,6 +491,17 @@ class DraftWritingAgent:
             policy["section_budgets"] = self._section_budgets(
                 sections, policy, strategy
             )
+
+            # Ejemplo dinámico de la regla 11 (una sola llamada por
+            # experimento, cacheada en disco -- ver _dynamic_split_example).
+            # Si falla o no es seguro, queda en None y el prompt de cada
+            # sección usa el ejemplo estático neutral automáticamente.
+            dynamic_example, dynamic_example_llm_call_made = self._dynamic_split_example(
+                policy, bundle, out
+            )
+            policy["dynamic_split_example"] = dynamic_example
+            if dynamic_example_llm_call_made:
+                llm_calls += 1
 
             # Comprueba que el borrador use el formato canónico esperado.
             # Si viene otro formato o falta la configuración, detiene la ejecución.

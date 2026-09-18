@@ -1,6 +1,130 @@
 from __future__ import annotations
 import json
+import re
 from .retrieval import safe_str
+
+
+# Conectores que disparan la regla 11 (dividir oraciones compuestas
+# verificables). Se reutiliza tanto para redactar la instrucción como
+# para validar que un ejemplo generado dinámicamente sí contenga uno.
+RULE_11_CONNECTORS = ("aunque", "a pesar de", "sin embargo", "mientras que", "pero")
+
+# Ejemplo estático de respaldo: deliberadamente neutral (sin vocabulario
+# de ningún dominio real de evaluación), usado cuando no hay un ejemplo
+# dinámico válido disponible en policy["dynamic_split_example"] (falló
+# la llamada al LLM, falló la validación, o policy no lo trae porque
+# viene de una versión anterior).
+_STATIC_RULE_11_MAL = (
+    'Aunque el enfoque propuesto por los autores obtuvo mejores\n'
+    '      resultados que el método de referencia, su aplicabilidad se ve\n'
+    '      limitada por el tamaño reducido de la muestra utilizada.'
+)
+_STATIC_RULE_11_BIEN = (
+    'El enfoque propuesto por los autores obtuvo mejores\n'
+    '        resultados que el método de referencia.',
+    'La aplicabilidad del enfoque propuesto se ve limitada por\n'
+    '        el tamaño reducido de la muestra utilizada.',
+)
+
+
+def build_dynamic_split_example_prompt(topic):
+    """Prompt para generar, UNA vez por experimento, un ejemplo MAL/BIEN
+    de la regla 11 con vocabulario del tema real de la corrida -- nunca
+    con datos verificables (cifras, datasets, nombres de algoritmos
+    reales), solo para dar sabor léxico. Nunca se usa como evidencia:
+    el resultado se valida con validate_dynamic_split_example() antes
+    de insertarse en build_section_prompt_v2(); si falla, se descarta
+    en favor del ejemplo estático neutral."""
+    topic_text = safe_str(topic) or "un tema científico general"
+    return f"""
+Vas a escribir un ejemplo DIDÁCTICO, completamente FICTICIO, para
+enseñarle a otro modelo de lenguaje una regla de estilo. NO estás
+redactando contenido real de ningún estado del arte.
+
+TEMA GENERAL (solo para dar vocabulario apropiado, NO para afirmar nada
+verificable sobre él): {topic_text}
+
+TAREA: escribe UNA oración de ejemplo que combine, en una sola frase,
+una afirmación de EFICACIA/VENTAJA y una afirmación de LIMITACIÓN,
+unidas por uno de estos conectores: "aunque", "a pesar de", "sin
+embargo", "mientras que" o "pero". Luego, la MISMA idea dividida en dos
+oraciones independientes (una por afirmación).
+
+PROHIBICIONES ESTRICTAS (el ejemplo es ilustrativo, no un hallazgo
+real):
+- NO uses ningún número, cifra, porcentaje, ni valor cuantitativo.
+- NO nombres un algoritmo, método, dataset, autor, año o herramienta
+  real y específico (nada de "SVM", "Random Forest", "BERT", "EU ETS",
+  nombres de datasets, etc.) -- usa referencias genéricas como "el
+  enfoque propuesto", "el método analizado", "la técnica estudiada".
+- NO uses corchetes de cita ni ningún identificador técnico.
+- El ejemplo debe sonar temáticamente relacionado con el tema general
+  dado arriba (para que el vocabulario no sea genérico al punto de
+  parecer de otro campo), pero sin afirmar ningún hecho verificable.
+
+Devuelve ÚNICAMENTE este JSON, sin texto antes ni después, sin fences
+de markdown:
+{{
+  "mal": "<la oración compuesta de ejemplo, con el conector>",
+  "bien": [
+    "<primera oración independiente, solo la afirmación de eficacia>",
+    "<segunda oración independiente, solo la afirmación de limitación>"
+  ]
+}}
+""".strip()
+
+
+def validate_dynamic_split_example(example):
+    """Chequeo determinístico (sin LLM) del ejemplo generado
+    dinámicamente -- rechaza cualquier cosa que se parezca a un hecho
+    verificable o a evidencia real. Devuelve True solo si el ejemplo es
+    seguro para insertarse en el prompt de la 06."""
+    if not isinstance(example, dict):
+        return False
+    mal = example.get("mal")
+    bien = example.get("bien")
+    if not isinstance(mal, str) or not mal.strip():
+        return False
+    if not isinstance(bien, list) or len(bien) != 2:
+        return False
+    if not all(isinstance(s, str) and s.strip() for s in bien):
+        return False
+
+    combined = mal + " " + " ".join(bien)
+
+    # Nada de cifras, porcentajes ni corchetes de cita/evidencia.
+    if re.search(r"\d", combined):
+        return False
+    if "%" in combined or "[" in combined or "]" in combined:
+        return False
+
+    # El "mal" debe realmente contener uno de los conectores objetivo
+    # (si no, no ilustra la regla que queremos enseñar).
+    mal_lower = mal.casefold()
+    if not any(connector in mal_lower for connector in RULE_11_CONNECTORS):
+        return False
+
+    # Longitud razonable -- ni vacío ni desproporcionado.
+    if len(mal) > 400 or any(len(s) > 250 for s in bien):
+        return False
+
+    return True
+
+
+def render_rule_11_example(policy):
+    """Devuelve el bloque MAL/BIEN ya formateado para insertar en la
+    regla 11 del prompt. Usa policy["dynamic_split_example"] si existe
+    y pasa validate_dynamic_split_example(); si no, cae al ejemplo
+    estático neutral -- nunca deja la regla sin ejemplo."""
+    dynamic = policy.get("dynamic_split_example")
+    if isinstance(dynamic, dict) and validate_dynamic_split_example(dynamic):
+        mal = dynamic["mal"]
+        bien = dynamic["bien"]
+    else:
+        mal = _STATIC_RULE_11_MAL
+        bien = _STATIC_RULE_11_BIEN
+    bien_block = ",\n".join(f'        "{s}"' for s in bien)
+    return mal, bien_block
 
 
 def language_instruction(output_language):
@@ -109,6 +233,7 @@ def build_section_prompt_v2(section, evidence, quantitative_context, previous_er
         policy["target_total_words"],
     )
     budget = budgets[section_id]
+    rule_11_mal, rule_11_bien_block = render_rule_11_example(policy)
     return f"""
 Eres el agente redactor de un sistema multiagente para estados del arte científicos.
 
@@ -139,16 +264,11 @@ REGLAS:
     Ejemplo de lo que NUNCA debes hacer (una sola oración mezclando
     eficacia y limitación -- el patrón es estructural/gramatical, no
     depende del tema del que trate el estado del arte):
-      MAL: "Aunque el enfoque propuesto por los autores obtuvo mejores
-      resultados que el método de referencia, su aplicabilidad se ve
-      limitada por el tamaño reducido de la muestra utilizada."
+      MAL: "{rule_11_mal}"
     En su lugar, divide SIEMPRE en dos oraciones independientes, cada
     una con el/los handles que la respaldan específicamente a ELLA:
       BIEN: [
-        "El enfoque propuesto por los autores obtuvo mejores
-        resultados que el método de referencia.",
-        "La aplicabilidad del enfoque propuesto se ve limitada por
-        el tamaño reducido de la muestra utilizada."
+{rule_11_bien_block}
       ]
     Esta regla es obligatoria, no opcional: cualquier oración que
     contenga "aunque", "a pesar de", "sin embargo", "mientras que" o
