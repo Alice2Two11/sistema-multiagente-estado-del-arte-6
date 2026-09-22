@@ -493,7 +493,15 @@ def compute_allowed_actions(observation: AgenticRetrievalObservation) -> tuple[s
 class AgenticPlannerResponseError(ValueError):
     """La respuesta del planner no pudo interpretarse como una decisión
     válida tras agotar los reintentos de parseo."""
-MAX_PLANNER_PARSE_RETRIES = 2
+# Antes en 2 (3 llamadas totales). Encontramos un caso real
+# (AGENTIC_PLANNER_FAILED, claim S6_C9, corrida paper_50) donde el
+# planner devolvió 3 respuestas inválidas seguidas y el ciclo abortó
+# sin gastar presupuesto de retrieval -- FINISH_UNRESOLVED por una
+# fragilidad de formato del LLM, no por falta de evidencia real. Subir
+# a 3 (4 llamadas totales) da un intento más de formato antes de darse
+# por vencido; sigue siendo fail-closed (AGENTIC_PLANNER_FAILED ->
+# manual review) si el LLM insiste en fallar el formato.
+MAX_PLANNER_PARSE_RETRIES = 3
 
 # Construye el prompt que se enviará al planner para que elija una única acción
 # válida de Agentic Retrieval a partir del estado actual del claim.

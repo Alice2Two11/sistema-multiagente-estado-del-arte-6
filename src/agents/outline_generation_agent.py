@@ -127,7 +127,8 @@ class OutlineGenerationAgent:
                 valid,
                 int(agent_input.policy.get("min_sections", 4)),
                 int(agent_input.policy.get("max_sections", 5)),
-                sr,us,cr,uc
+                sr,us,cr,uc,
+                minimum_paper_coverage_rate=agent_input.policy.get("minimum_paper_coverage_rate")
             )
 
             # Añade a la validación información de trazabilidad sobre el experimento,
@@ -214,8 +215,14 @@ class OutlineGenerationAgent:
             # Guarda los resultados generados por la etapa 05
             artifacts = write_outline_artifacts(out,outline,raw,validation,manifest)
             # convierte los códigos de validación en advertencias del agente.
+            # LOW_PAPER_COVERAGE es la única excepción no bloqueante: es
+            # visibilidad sobre minimum_paper_coverage_rate (antes
+            # TRUE_STALE_CONFIG, nunca comparado contra nada), nunca afecta
+            # validation_ok/quality_status ni la transición -- por eso su
+            # warning tampoco se marca como blocking, para no sugerir lo
+            # contrario a quien lea el resultado.
             warn = tuple(
-                AgentWarning(code=c,severity=WarningSeverity.WARNING,blocking=True,message=c)
+                AgentWarning(code=c,severity=WarningSeverity.WARNING,blocking=(c!="LOW_PAPER_COVERAGE"),message=c)
                 for c in codes
             )
 

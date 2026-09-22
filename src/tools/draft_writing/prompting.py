@@ -247,7 +247,13 @@ REGLAS:
 1. Usa exclusivamente la evidencia proporcionada en EVIDENCIA_DISPONIBLE.
 2. No uses conocimiento externo ni Ground Truth.
 3. No referencies ningún número de evidencia (handle) fuera de los
-   listados en EVIDENCIA_DISPONIBLE.
+   listados en EVIDENCIA_DISPONIBLE. El handle más alto disponible es
+   "E{len(evidence_handles)}" -- NO EXISTE ningún handle mayor a ese
+   número (nunca "E{len(evidence_handles) + 1}" ni superior), aunque el
+   texto de la evidencia contenga números de cita propios del paper
+   original (ej. "[45]", "[3]") -- esos números NO son handles, son
+   parte del contenido citado y nunca deben confundirse con
+   "supporting_evidence_ids".
 4. No inventes autores, años, datasets, métricas, valores ni resultados.
 5. No sustituyas un handle de evidencia por otro.
 6. El estilo bibliográfico {policy.get('citation_style', '')} no autoriza inventar autores o años.
@@ -289,12 +295,26 @@ REGLAS:
 15. Toda oración con contenido factual/científico debe llevar al menos
     un handle en "supporting_evidence_ids". Omite cualquier oración que
     no tenga evidencia documental real.
-16. PROHIBIDO incluir en cualquier elemento de "sentences" los campos:
+16. Cuando dos o más evidencias de EVIDENCIA_DISPONIBLE reporten
+    resultados cuantitativos comparables para el mismo problema (ej.
+    accuracy, F1, precisión, tiempo de entrenamiento, tamaño de
+    modelo), redacta al menos una oración que los contraste
+    EXPLÍCITAMENTE citando ambos handles juntos -- nunca te limites a
+    mencionar cada resultado por separado en oraciones distintas sin
+    conectarlos. El contraste debe seguir siendo UNA sola oración
+    verificable con sus propios handles (regla 10/11: si la
+    comparación combina una ventaja y una limitación con conectores
+    como "aunque" o "mientras que", sigue dividiéndola en dos
+    oraciones, cada una con el contraste que le corresponde). No
+    inventes un tercer valor para la comparación -- usa únicamente los
+    números que aparecen literalmente en la evidencia citada (regla
+    14).
+17. PROHIBIDO incluir en cualquier elemento de "sentences" los campos:
     "supporting_citations", "source_filename", "chunk_id", "claim",
     "claim_id", "claim_uid", "sentence_id", "identity_action",
     "parent_claim_uids". El sistema los asigna/resuelve después -- si
     los incluyes, la respuesta completa será rechazada.
-17. Devuelve ÚNICAMENTE JSON válido -- sin fences de Markdown (nunca
+18. Devuelve ÚNICAMENTE JSON válido -- sin fences de Markdown (nunca
     ```json ni ```), sin texto antes ni después del JSON.
 
 FORMATO EXACTO (el único permitido):
@@ -311,7 +331,9 @@ FORMATO EXACTO (el único permitido):
 SECCIÓN DEL ESQUEMA:
 {json.dumps(section, ensure_ascii=False, indent=2)}
 
-EVIDENCIA_DISPONIBLE (referencia cada una ÚNICAMENTE por su "handle" -- nunca por source_filename/chunk_id):
+EVIDENCIA_DISPONIBLE (referencia cada una ÚNICAMENTE por su "handle" -- nunca por source_filename/chunk_id).
+Hay EXACTAMENTE {len(evidence_handles)} evidencias disponibles, numeradas "E1" a "E{len(evidence_handles)}".
+No existe "E{len(evidence_handles) + 1}" ni ningún handle posterior -- si necesitas respaldar una idea y ninguno de estos {len(evidence_handles)} handles la respalda, omite esa oración en vez de inventar un handle:
 {json.dumps(evidence_handles, ensure_ascii=False, indent=2)}
 
 CONTEXTO CUANTITATIVO CONFIRMADO:

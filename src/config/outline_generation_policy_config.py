@@ -31,10 +31,18 @@ DEFAULT_POLICY={
 # validó ni consumió; si algún llamador todavía los pasa como
 # ``overrides``, simplemente se ignoran (compatibilidad hacia atrás,
 # sin romper nada). Clasificación final:
-# - minimum_paper_coverage_rate/context_warning_tokens/
-#   context_max_tokens: TRUE_STALE_CONFIG -- rastreado explícitamente
-#   en validate_outline()/reason_codes()/context_builder.py, sin
-#   ningún mecanismo equivalente. Candidatos a retirar de 00.
+# - minimum_paper_coverage_rate: YA NO ES TRUE_STALE_CONFIG -- ahora
+#   validate_outline()/reason_codes() calculan paper_coverage_rate
+#   (papers_used_count/papers_available_count) y lo comparan contra
+#   este valor, agregando el código informativo LOW_PAPER_COVERAGE
+#   cuando no se alcanza. Deliberadamente NO entra en el cálculo de
+#   "ok"/validation_ok: nunca provoca NEEDS_REVISION/RETRY/HALT_STAGE
+#   por sí solo (su AgentWarning tampoco se marca "blocking", ver
+#   outline_generation_agent.py) -- es visibilidad sobre qué fracción
+#   real del corpus terminó citada en el esquema, no un gate nuevo que
+#   pudiera romper corridas que hoy pasan.
+# - context_warning_tokens/context_max_tokens: TRUE_STALE_CONFIG --
+#   sin ningún mecanismo equivalente. Candidatos a retirar de 00.
 # - allow_source_repair: ABSORBED_BY_OTHER_MECHANISM -- Stage 05 SÍ
 #   repara/valida fuentes por título siempre (source_repair.py:
 #   repair_outline_sources/repair_coverage_summary), controlado por
