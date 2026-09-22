@@ -28,10 +28,8 @@ def validate_outline_dependencies(agent_input):
  bad=kb['title'].fillna('').astype(str).str.strip().str.lower().isin(['','error','no especificado','nan'])
  if bad.any(): raise ValueError('INVALID_SOURCE_TITLE')
  if kb['source_filename'].astype(str).str.contains('ground.?truth',case=False,regex=True).any(): raise ValueError('GROUND_TRUTH_POLICY_VIOLATION')
- structure=None
- if 'suggested_structure_json' in deps and Path(deps['suggested_structure_json'].path).is_file():
-  structure=_json(deps['suggested_structure_json'].path)
- elif 'suggested_structure_csv' in deps and Path(deps['suggested_structure_csv'].path).is_file():
-  structure=pd.read_csv(deps['suggested_structure_csv'].path).to_dict(orient='records')
- else: raise FileNotFoundError('OUTLINE_INPUT_NOT_FOUND:suggested_structure')
- return {'thematic':thematic,'manifest':manifest,'validation':validation,'themes':pd.read_csv(deps['themes_summary_csv'].path),'gaps':pd.read_csv(deps['research_gaps_csv'].path),'comparative':pd.read_csv(deps['comparative_table_papers_csv'].path),'kb':kb,'structure':structure}
+ # 04 ya no genera ninguna propuesta preliminar de estructura
+ # (suggested_state_of_art_structure) -- 05 nunca la trataba como
+ # vinculante, solo como contexto opcional para el LLM, y ahora ya no
+ # existe en absoluto.
+ return {'thematic':thematic,'manifest':manifest,'validation':validation,'themes':pd.read_csv(deps['themes_summary_csv'].path),'gaps':pd.read_csv(deps['research_gaps_csv'].path),'comparative':pd.read_csv(deps['comparative_table_papers_csv'].path),'kb':kb}

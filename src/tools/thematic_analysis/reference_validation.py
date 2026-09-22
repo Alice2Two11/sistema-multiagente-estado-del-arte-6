@@ -26,8 +26,6 @@ def validate_references(data,df):
         if not reps: issues.append('EMPTY_REPRESENTATIVE_SOURCE')
         for p in reps:
             s,tt=_paper(p); check(s,tt,'INVALID_REPRESENTATIVE_SOURCE','EMPTY_REPRESENTATIVE_SOURCE')
-    for s in data['suggested_state_of_art_structure']:
-        for src in s.get('recommended_sources',[]) or []: check(str(src),'','INVALID_STRUCTURE_SOURCE')
     for g in data['research_gaps']:
         srcs=g.get('supporting_sources',[]) or []
         if not srcs: issues.append('MISSING_GAP_EVIDENCE')

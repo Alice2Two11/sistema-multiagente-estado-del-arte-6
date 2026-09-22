@@ -117,38 +117,6 @@ def normalize_gap_records(records: list[dict]) -> tuple[list[dict], list[dict], 
     return normalized, repairs, issues
 
 
-def normalize_structure_records(records: list[dict]) -> tuple[list[dict], list[dict], list[dict]]:
-    normalized: list[dict] = []
-    repairs: list[dict] = []
-    issues: list[dict] = []
-    for index, raw in enumerate(records, start=1):
-        if not isinstance(raw, dict):
-            issues.append({"code": "INVALID_STRUCTURE_RECORD", "index": index, "value": repr(raw)})
-            continue
-        record = deepcopy(raw)
-        section_id = _first_text(record, ("section_id", "id"))
-        if not section_id:
-            section_id = f"S{index}"
-            _record_repair(repairs, block="suggested_state_of_art_structure", index=index, action="DETERMINISTIC_ID_GENERATED", target_key="section_id", value=section_id)
-        section_title = _first_text(record, ("section_title", "section", "title", "name"))
-        if not record.get("section_title") and section_title:
-            source_key = next((k for k in ("section", "title", "name") if record.get(k)), None)
-            _record_repair(repairs, block="suggested_state_of_art_structure", index=index, action="ALIAS_MAPPED", source_key=source_key, target_key="section_title")
-        description = _first_text(record, ("description", "content", "summary", "purpose"))
-        if not record.get("description") and description:
-            source_key = next((k for k in ("content", "summary", "purpose") if record.get(k)), None)
-            _record_repair(repairs, block="suggested_state_of_art_structure", index=index, action="ALIAS_MAPPED", source_key=source_key, target_key="description")
-        sources = _normalize_sources(_first_value(record, ("recommended_sources", "sources", "papers", "references"), []))
-        normalized.append({
-            **record,
-            "section_id": section_id,
-            "section_title": section_title,
-            "description": description,
-            "recommended_sources": sources,
-        })
-    return normalized, repairs, issues
-
-
 def normalize_dimension_records(records: list[dict]) -> tuple[list[dict], list[dict], list[dict]]:
     normalized: list[dict] = []
     repairs: list[dict] = []
@@ -182,7 +150,6 @@ def normalize_thematic_output(payload: Any, *, return_repairs: bool = False):
     out = deepcopy(payload)
     top_aliases = {
         "gaps": "research_gaps",
-        "structure": "suggested_state_of_art_structure",
         "dimensions": "comparative_dimensions",
     }
     top_repairs: list[dict] = []
@@ -191,23 +158,21 @@ def normalize_thematic_output(payload: Any, *, return_repairs: bool = False):
             out[target_key] = out[source_key]
             top_repairs.append({"type": "ALIAS_MAPPED", "block": "root", "source_key": source_key, "target_key": target_key})
 
-    for key in ("themes", "research_gaps", "suggested_state_of_art_structure", "comparative_dimensions"):
+    for key in ("themes", "research_gaps", "comparative_dimensions"):
         out[key] = _list(out.get(key, []))
-    if not any(out[key] for key in ("themes", "research_gaps", "suggested_state_of_art_structure", "comparative_dimensions")):
+    if not any(out[key] for key in ("themes", "research_gaps", "comparative_dimensions")):
         raise ValueError("EMPTY_THEMATIC_OUTPUT")
 
     themes, theme_repairs, theme_issues = normalize_theme_records(out["themes"])
     gaps, gap_repairs, gap_issues = normalize_gap_records(out["research_gaps"])
-    structure, structure_repairs, structure_issues = normalize_structure_records(out["suggested_state_of_art_structure"])
     dimensions, dimension_repairs, dimension_issues = normalize_dimension_records(out["comparative_dimensions"])
 
     out["themes"] = themes
     out["research_gaps"] = gaps
-    out["suggested_state_of_art_structure"] = structure
     out["comparative_dimensions"] = dimensions
 
-    issues = theme_issues + gap_issues + structure_issues + dimension_issues
-    repairs = top_repairs + theme_repairs + gap_repairs + structure_repairs + dimension_repairs
+    issues = theme_issues + gap_issues + dimension_issues
+    repairs = top_repairs + theme_repairs + gap_repairs + dimension_repairs
     if return_repairs:
         return out, issues, repairs
     return out, issues
@@ -218,7 +183,6 @@ def inspect_thematic_payload(payload: dict) -> dict:
     return {
         "raw_theme_records": len(_list(payload.get("themes", []))),
         "raw_gap_records": len(_list(payload.get("research_gaps", payload.get("gaps", [])))),
-        "raw_structure_records": len(_list(payload.get("suggested_state_of_art_structure", payload.get("structure", [])))),
         "raw_comparative_dimension_records": len(_list(payload.get("comparative_dimensions", payload.get("dimensions", [])))),
     }
 
@@ -228,7 +192,6 @@ def validate_json_to_tables(raw_counts: dict, table_counts: dict) -> tuple[list[
     mapping = (
         ("raw_theme_records", "flattened_theme_semantic_rows", "THEME_FLATTENING_FAILED"),
         ("raw_gap_records", "flattened_gap_semantic_rows", "GAP_FLATTENING_FAILED"),
-        ("raw_structure_records", "flattened_structure_semantic_rows", "STRUCTURE_FLATTENING_FAILED"),
         ("raw_comparative_dimension_records", "flattened_comparative_dimension_semantic_rows", "COMPARATIVE_DIMENSION_FLATTENING_FAILED"),
     )
     for raw_key, flat_key, code in mapping:

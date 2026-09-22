@@ -56,26 +56,16 @@ class ThematicAnalysisAgent:
                 else None
             )
 
-            # Obtiene de la política el número mínimo y máximO de secciones sugeridas para la estructura del estado del arte.
-            min_s = agent_input.policy.get("min_sections")
-            max_s = agent_input.policy.get("max_sections")
+            # NOTA (removido): 04 ya no propone ni autovalida una estructura
+            # de secciones (suggested_state_of_art_structure). Ver
+            # prompting.py para el detalle de por qué se quitó.
 
-            # Indica si el número mínimo y máximo de secciones debe cumplirse obligatoriamente o solo tomarse como referencia.
-            enforce_section_count = bool(
-                agent_input.policy
-                .get("structure_policy", {})
-                .get("enforce_section_count", False)
-            )
-
-            # Construye el prompt que se enviará al LLM con el contexto las referencias válidas, posibles reparaciones y reglas de estructura.
+            # Construye el prompt que se enviará al LLM con el contexto las referencias válidas y posibles reparaciones.
             prompt = self.dependencies.build_prompt(
                 context,
                 list(valid),
                 title_map,
-                repair_plan,
-                min_sections=min_s,
-                max_sections=max_s,
-                enforce_section_count=enforce_section_count
+                repair_plan
             )
 
             raw = self.dependencies.invoke(prompt)
@@ -116,28 +106,11 @@ class ThematicAnalysisAgent:
             if not data["comparative_dimensions"]:
                 codes.append("EMPTY_THEMATIC_OUTPUT")
 
-            sc = len(data["suggested_state_of_art_structure"])
-
-            # Comprueba si la estructura propuesta tiene menos o más
-            # secciones de las indicadas en la política.
-            structure_too_short = (min_s is not None and sc < int(min_s))
-            structure_too_long = (max_s is not None and sc > int(max_s))
-
-            # registra un error cuando queda por debajo o por encima del límite.
-            if enforce_section_count:
-                if structure_too_short:
-                    codes.append("STRUCTURE_TOO_SHORT")
-                if structure_too_long:
-                    codes.append("STRUCTURE_TOO_LONG")
-
-            # Calcula métricas para evaluar la calidad del análisis temático y comprobar si cumple con la estructura esperada.
+            # Calcula métricas para evaluar la calidad del análisis temático.
             metrics = calculate_diagnostic_metrics(
                 data,
                 final,
-                counts,
-                min_sections=min_s,
-                max_sections=max_s,
-                enforce_section_count=enforce_section_count
+                counts
             )
 
             # Comprueba si el plan de reparación realmente se aplicó, elimina errores duplicados y decide la calidad y la acción siguiente.

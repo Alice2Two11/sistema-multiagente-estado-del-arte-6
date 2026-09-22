@@ -83,10 +83,10 @@ def load_thematic_configuration(project_dir: str | Path, attempt_number: int = 1
     quant_dir = kb_dir
     thematic_dir = outputs / "03_thematic_analysis"
     policy = get_thematic_analysis_policy(active.get("thematic_analysis_policy", {}))
-    generation_profile = active.get("generation_profile", {})
-    if isinstance(generation_profile, dict):
-        policy.setdefault("min_sections", generation_profile.get("min_sections"))
-        policy.setdefault("max_sections", generation_profile.get("max_sections"))
+    # NOTA (removido): antes se inyectaban aquí min_sections/max_sections
+    # del generation_profile para que 04 autovalidara su propuesta de
+    # estructura contra ellos. 04 ya no propone ni valida estructura, así
+    # que esos campos quedaron sin consumidor y se quitaron.
     # CONFIG-C (Stage 04): openai_model es responsabilidad de
     # 00_setup_config.ipynb -- 07 ya lo exige fail-closed
     # (verification_orchestrator_runtime.py::_require_active_experiment_key);
